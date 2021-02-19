@@ -1,6 +1,6 @@
 const { html, render } = require("lit-html");
 var lib = require("../");
-const getRuntime = lib.getRuntime;
+const getRuntime = require("../runtime");
 var filters = {
   add: function (val, i) {
     return val + i;
@@ -16,7 +16,7 @@ var fileCache = global.fileCache || (global.fileCache = {});
 const jinja = {
   compile(source, opts) {
     lib.readTemplateFile = this.getTemplate;
-    const tmpl = lib.compile(source, { ...opts, runtime: false });
+    const tmpl = lib.compile(source, { ...opts });
     var name = opts && opts.filename;
     if (name) {
       var file = ~name.indexOf(".") ? name : name + ".html";

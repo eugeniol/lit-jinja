@@ -1,5 +1,5 @@
 /*!
- * Jinja Templating for JavaScript v0.1.8
+ * Jinja Templating for lit-html v0.0.1
  * https://github.com/sstur/jinja-js
  *
  * This is a slimmed-down Jinja2 implementation [http://jinja.pocoo.org/]
@@ -18,40 +18,38 @@
  * - `.2` is not a valid number literal; use `0.2`
  *
  */
-const { html } = require("lit-html");
-const { unsafeHTML } = require("lit-html/directives/unsafe-html");
-const { repeat } = require("lit-html/directives/repeat");
-/*global require, exports, module, define */
-var STRINGS = /'(\\.|[^'])*'|"(\\.|[^"'"])*"/g;
-var IDENTS_AND_NUMS = /([$_a-z][$\w]*)|([+-]?\d+(\.\d+)?)/g;
-var NUMBER = /^[+-]?\d+(\.\d+)?$/;
-//non-primitive literals (array and object literals)
-var NON_PRIMITIVES = /\[[@#~](,[@#~])*\]|\[\]|\{([@i]:[@#~])(,[@i]:[@#~])*\}|\{\}/g;
-//bare identifiers such as variables and in object literals: {foo: 'value'}
-var IDENTIFIERS = /[$_a-z][$\w]*/gi;
-var VARIABLES = /i(\.i|\[[@#i]\])*/g;
-var ACCESSOR = /(\.i|\[[@#i]\])/g;
-var OPERATORS = /(===?|!==?|>=?|<=?|&&|\|\||[+\-\*\/%])/g;
-//extended (english) operators
-var EOPS = /(^|[^$\w])(and|or|not|is|isnot)([^$\w]|$)/g;
-var LEADING_SPACE = /^\s+/;
-var TRAILING_SPACE = /\s+$/;
+const tagHandlers = require("./tags");
 
-var START_TOKEN = /\{\{\{|\{\{|\{%|\{#/;
-var TAGS = {
+const STRINGS = /'(\\.|[^'])*'|"(\\.|[^"'"])*"/g;
+const IDENTS_AND_NUMS = /([$_a-z][$\w]*)|([+-]?\d+(\.\d+)?)/g;
+const NUMBER = /^[+-]?\d+(\.\d+)?$/;
+//non-primitive literals (array and object literals)
+const NON_PRIMITIVES = /\[[@#~](,[@#~])*\]|\[\]|\{([@i]:[@#~])(,[@i]:[@#~])*\}|\{\}/g;
+//bare identifiers such as variables and in object literals: {foo: 'value'}
+const IDENTIFIERS = /[$_a-z][$\w]*/gi;
+const VARIABLES = /i(\.i|\[[@#i]\])*/g;
+const ACCESSOR = /(\.i|\[[@#i]\])/g;
+const OPERATORS = /(===?|!==?|>=?|<=?|&&|\|\||[+\-\*\/%])/g;
+//extended (english) operators
+const EOPS = /(^|[^$\w])(and|or|not|is|isnot)([^$\w]|$)/g;
+const LEADING_SPACE = /^\s+/;
+const TRAILING_SPACE = /\s+$/;
+
+const START_TOKEN = /\{\{\{|\{\{|\{%|\{#/;
+const TAGS = {
   "{{{": /^('(\\.|[^'])*'|"(\\.|[^"'"])*"|.)+?\}\}\}/,
   "{{": /^('(\\.|[^'])*'|"(\\.|[^"'"])*"|.)+?\}\}/,
   "{%": /^('(\\.|[^'])*'|"(\\.|[^"'"])*"|.)+?%\}/,
   "{#": /^('(\\.|[^'])*'|"(\\.|[^"'"])*"|.)+?#\}/,
 };
 
-var delimeters = {
+const delimeters = {
   "{%": "directive",
   "{{": "output",
   "{#": "comment",
 };
 
-var operators = {
+const operators = {
   and: "&&",
   or: "||",
   not: "!",
@@ -59,7 +57,7 @@ var operators = {
   isnot: "!=",
 };
 
-var constants = {
+const constants = {
   true: true,
   false: false,
   null: null,
@@ -302,328 +300,21 @@ Parser.prototype.parseQuoted = function (str) {
   return JSON.parse(str);
 };
 
-//the context 'this' inside tagHandlers is the parser instance
-var tagHandlers = {
-  if: function (expr) {
-    this.push("${ " + this.parseExpr(expr) + " ? html`");
-    this.nest.unshift("if");
-  },
-  else: function () {
-    if (this.nest[0] == "for") {
-      this.push("`, () => html`");
-    } else {
-      this.push("` : html`");
-      this.nest.unshift("else");
-    }
-  },
-  elseif: function (expr) {
-    this.push("` : ");
-    this.nest.unshift("else");
-    this.push("" + this.parseExpr(expr) + " ? html`");
-    this.nest.unshift("if");
-  },
-  endif: function () {
-    if (this.nest[0] === "else") {
-      this.nest.shift();
-      this.nest.shift();
-      this.push("`}");
-    } else {
-      this.push("` : null }");
-    }
-  },
-  for: function (str) {
-    var i = str.indexOf(" in ");
-    var name = str.slice(0, i).trim();
-    var expr = str.slice(i + 4).trim();
-    this.push(
-      "${each(" +
-        this.parseExpr(expr) +
-        "," +
-        JSON.stringify(name) +
-        ",() => html`"
-    );
-    this.nest.unshift("for");
-  },
-  endfor: function () {
-    this.nest.shift();
-    this.push("`)}");
-  },
-  raw: function () {
-    this.rawMode = true;
-  },
-  endraw: function () {
-    this.rawMode = false;
-  },
-  set: function (stmt) {
-    var i = stmt.indexOf("=");
-    var name = stmt.slice(0, i).trim();
-    var expr = stmt.slice(i + 1).trim();
-    this.push(
-      "${ set(" + JSON.stringify(name) + "," + this.parseExpr(expr) + ") }"
-    );
-  },
-  block: function (name) {
-    if (this.isParent) {
-      ++this.parentBlocks;
-      var blockName = "block_" + (this.escName(name) || this.parentBlocks);
-      this.push(
-        "${ block(typeof " +
-          blockName +
-          ' == "function" ? ' +
-          blockName +
-          " : function() { return html`"
-      );
-    } else if (this.hasParent) {
-      this.isSilent = false;
-      ++this.childBlocks;
-      blockName = "block_" + (this.escName(name) || this.childBlocks);
-      this.push("${ function " + blockName + "() { return html`");
-    }
-    this.nest.unshift("block");
-  },
-  endblock: function () {
-    this.nest.shift();
-    if (this.isParent) {
-      this.push("`})}");
-    } else if (this.hasParent) {
-      this.push("`; } }");
-      this.isSilent = true;
-    }
-  },
-  extends: function (name) {
-    name = this.parseQuoted(name);
-    var parentSrc = this.readTemplateFile(name);
-    this.isParent = true;
-    this.tokenize(parentSrc);
-    this.isParent = false;
-    this.hasParent = true;
-    //silence output until we enter a child block
-    this.isSilent = true;
-  },
-  include: function (name) {
-    name = this.parseQuoted(name);
-    var incSrc = this.readTemplateFile(name);
-    this.isInclude = true;
-    this.tokenize(incSrc);
-    this.isInclude = false;
-  },
-};
-
-//liquid style
-tagHandlers.assign = tagHandlers.set;
-//python/django style
-tagHandlers.elif = tagHandlers.elseif;
-
-var getRuntime = function runtime(data, opts) {
-  var defaults = { autoEscape: "html" };
-  var _toString = Object.prototype.toString;
-  var _hasOwnProperty = Object.prototype.hasOwnProperty;
-  var getKeys =
-    Object.keys ||
-    function (obj) {
-      var keys = [];
-      for (var n in obj) if (_hasOwnProperty.call(obj, n)) keys.push(n);
-      return keys;
-    };
-  var isArray =
-    Array.isArray ||
-    function (obj) {
-      return _toString.call(obj) === "[object Array]";
-    };
-  var create =
-    Object.create ||
-    function (obj) {
-      function F() {}
-      F.prototype = obj;
-      return new F();
-    };
-  var toString = function (val) {
-    if (val == null) return "";
-    return typeof val.toString == "function"
-      ? val.toString()
-      : _toString.call(val);
-  };
-  var extend = function (dest, src) {
-    var keys = getKeys(src);
-    for (var i = 0, len = keys.length; i < len; i++) {
-      var key = keys[i];
-      dest[key] = src[key];
-    }
-    return dest;
-  };
-  //get a value, lexically, starting in current context; a.b -> get("a","b")
-  var get = function () {
-    var val,
-      n = arguments[0],
-      c = stack.length;
-    while (c--) {
-      val = stack[c][n];
-      if (typeof val != "undefined") break;
-    }
-    for (var i = 1, len = arguments.length; i < len; i++) {
-      if (val == null) continue;
-      n = arguments[i];
-      val = _hasOwnProperty.call(val, n)
-        ? val[n]
-        : typeof val._get == "function"
-        ? (val[n] = val._get(n))
-        : null;
-    }
-    return val == null ? null : val;
-  };
-  var set = function (n, val) {
-    stack[stack.length - 1][n] = val;
-  };
-  var push = function (ctx) {
-    stack.push(ctx || {});
-  };
-  var pop = function () {
-    stack.pop();
-  };
-  var write = function (str) {
-    output.push(str);
-  };
-  var filter = function (val) {
-    for (var i = 1, len = arguments.length; i < len; i++) {
-      var arr = arguments[i],
-        name = arr[0],
-        filter = filters[name];
-      if (filter) {
-        arr[0] = val;
-        //now arr looks like [val, arg1, arg2]
-        val = filter.apply(data, arr);
-      } else {
-        throw new Error("Invalid filter: " + name);
-      }
-    }
-    if (opts.autoEscape && name != opts.autoEscape && name != "safe") {
-      //auto escape if not explicitly safe or already escaped
-      val = filters[opts.autoEscape].call(data, val);
-    }
-    return val;
-  };
-  var each = function (obj, loopvar, fn1, fn2) {
-    if (obj == null) return;
-    var arr = isArray(obj) ? obj : getKeys(obj),
-      len = arr.length;
-    var ctx = { loop: { length: len, first: arr[0], last: arr[len - 1] } };
-    push(ctx);
-    let result;
-    if (len == 0 && fn2) result = fn2();
-    else
-      result = repeat(arr, (item, i) => {
-        extend(ctx.loop, { index: i + 1, index0: i });
-        return fn1((ctx[loopvar] = arr[i]));
-      });
-    // revisit this
-    setImmediate(pop);
-    return result;
-  };
-  var block = function (fn) {
-    push();
-    fn();
-    pop();
-  };
-  var render = function () {
-    return output.join("");
-  };
-  data = data || {};
-  opts = extend(defaults, opts || {});
-  var filters = extend(
-    {
-      html:
-        unsafeHTML ||
-        function (val) {
-          return toString(val)
-            .split("&")
-            .join("&amp;")
-            .split("<")
-            .join("&lt;")
-            .split(">")
-            .join("&gt;")
-            .split('"')
-            .join("&quot;");
-        },
-      safe:
-        unsafeHTML ||
-        function (val) {
-          return unsafeHTML(val);
-        },
-    },
-    opts.filters || {}
-  );
-  var stack = [create(data || {})],
-    output = [];
-  return {
-    get: get,
-    set: set,
-    push: push,
-    pop: pop,
-    write: write,
-    filter: filter,
-    each: each,
-    block: block,
-    render: render,
-    html,
-    // _html(strings, ...values) {
-    //   let ret = "";
-    //   for (let i = 0; i < strings.length; i++) {
-    //     ret += strings[i];
-    //     if (i < values.length) {
-    //       ret += values[i];
-    //     }
-    //   }
-    //   return ret;
-    //   console.log(strings, values);
-    //   return strings
-    //     .map((str, i) => {
-    //       // console.log(str)
-    //       return str + (i < values.length - 1) ? values[i] : "";
-    //     })
-    //     .join("");
-    // },
-  };
-};
-
-const jinja = {};
-
-var runtime;
-jinja.Parser = Parser;
-jinja.compile = function (markup, opts) {
+function compile(markup, opts) {
   opts = opts || {};
   var parser = new Parser();
   parser.readTemplateFile = this.readTemplateFile;
-
   var code = [
     "({get,set,push,pop,filter,each,block,html}) => { ",
     "return html`",
     ...parser.parse(markup),
     "`; }",
   ].join("");
-  console.log(code);
-  if (opts.runtime === false) {
-    var fn = new Function("runtime", "return (" + code + ")(runtime)");
-  } else {
-    runtime = runtime || (runtime = getRuntime.toString());
-    fn = new Function(
-      "data",
-      "options",
-      "return (" + code + ")((" + runtime + ")(data, options))"
-    );
-  }
-  return fn;
-};
 
-jinja.getRuntime = getRuntime;
+  return new Function("runtime", "return (" + code + ")(runtime)");
+}
 
-jinja.render = function (markup, data, opts) {
-  var tmpl = jinja.compile(markup);
-  return tmpl.render(data, opts);
-};
-
-jinja.templateFiles = [];
-
-jinja.readTemplateFile = function (name) {
+function readTemplateFile(name) {
   var templateFiles = this.templateFiles || [];
   console.log("templateFiles", this);
   var templateFile = templateFiles[name];
@@ -631,7 +322,7 @@ jinja.readTemplateFile = function (name) {
     throw new Error("Template file not found: " + name);
   }
   return templateFile;
-};
+}
 
 /*!
  * Helpers
@@ -660,4 +351,9 @@ function matchAll(str, reg, fn) {
   }
 }
 
-module.exports = jinja;
+module.exports = {
+  Parser,
+  templateFiles: [],
+  compile,
+  readTemplateFile,
+};
