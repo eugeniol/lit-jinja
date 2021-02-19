@@ -1,6 +1,12 @@
 const { html, render } = require("lit-html");
-var lib = require("../");
-const getRuntime = require("../runtime");
+const { unsafeHTML } = require("lit-html/directives/unsafe-html");
+const { repeat } = require("lit-html/directives/repeat");
+const createRuntime = require("../runtime");
+
+const { compile } = require("../");
+
+const runtime = createRuntime({ html, unsafeHTML, repeat });
+
 var filters = {
   add: function (val, i) {
     return val + i;
@@ -15,8 +21,7 @@ var filters = {
 var fileCache = global.fileCache || (global.fileCache = {});
 const jinja = {
   compile(source, opts) {
-    lib.readTemplateFile = this.getTemplate;
-    const tmpl = lib.compile(source, { ...opts });
+    const tmpl = compile.call(this, source, { ...opts });
     var name = opts && opts.filename;
     if (name) {
       var file = ~name.indexOf(".") ? name : name + ".html";
@@ -25,13 +30,13 @@ const jinja = {
     }
     return (context, opts) => {
       const d = document.createElement("div");
-      const content = tmpl(getRuntime(context, opts));
+      const content = tmpl(runtime(context, opts));
       render(content, d);
       return d.innerHTML.replace(/<!---->/g, "");
     };
   },
 
-  getTemplate(name) {
+  readTemplateFile(name) {
     var file = ~name.indexOf(".") ? name : name + ".html";
     file = "./views/" + file;
     if (file in fileCache) {
