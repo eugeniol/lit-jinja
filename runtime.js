@@ -1,6 +1,8 @@
 function createRuntime({ html, unsafeHTML, repeat, ...opts }) {
   return (data, opts) => {
-    var defaults = { autoEscape: "html" };
+    var defaults = { 
+      // autoEscape: "html" 
+    };
     var _toString = Object.prototype.toString;
     var _hasOwnProperty = Object.prototype.hasOwnProperty;
     var getKeys =

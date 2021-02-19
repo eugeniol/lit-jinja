@@ -19,7 +19,7 @@ var filters = {
   },
 };
 var fileCache = global.fileCache || (global.fileCache = {});
-const jinja = {
+const litJinja = {
   compile(source, opts) {
     const tmpl = compile.call(this, source, { ...opts });
     var name = opts && opts.filename;
@@ -48,64 +48,74 @@ const jinja = {
 };
 test("tests string literals", function () {
   const input = `hola {{name}}`;
-  const tmpl = jinja.compile(input);
+  const tmpl = litJinja.compile(input);
   expect(tmpl({ name: "mundo" })).toEqual("hola mundo");
 });
+
+test("should lit-html object bindings", () => {
+  const source = `<uke-el .content="{{someContent}}"></uke-el>`;
+  const someContent = { data: true };
+  const tmpl = compile(source)(runtime({ someContent }));
+  render(tmpl, document.body);
+
+  expect(document.querySelector("uke-el").content).toEqual(someContent);
+});
+
 describe("Values and Literals:", function () {
   it("tests string literals", function () {
-    var tpl = jinja.compile('{{ "abc" }}');
+    var tpl = litJinja.compile('{{ "abc" }}');
     expect(tpl({})).toEqual("abc");
 
-    tpl = jinja.compile("{{ 'abc' }}");
+    tpl = litJinja.compile("{{ 'abc' }}");
     expect(tpl({})).toEqual("abc");
 
-    tpl = jinja.compile("{{ '}}' }}");
+    tpl = litJinja.compile("{{ '}}' }}");
     expect(tpl({})).toEqual("}}");
   });
 
   it("tests other literals", function () {
-    var tpl = jinja.compile("{{ 0 }}");
+    var tpl = litJinja.compile("{{ 0 }}");
     expect(tpl({})).toEqual("0");
 
-    tpl = jinja.compile("{{ true }}");
+    tpl = litJinja.compile("{{ true }}");
     expect(tpl({})).toEqual("true");
 
-    tpl = jinja.compile("{{ false }}");
+    tpl = litJinja.compile("{{ false }}");
     expect(tpl({})).toEqual("false");
 
-    tpl = jinja.compile("{{ null }}");
+    tpl = litJinja.compile("{{ null }}");
     expect(tpl({})).toEqual("");
   });
 });
 
 describe("Variables and Subscript Access:", function () {
   it("tests string literals", function () {
-    var tpl = jinja.compile("{{ foo.bar }}");
+    var tpl = litJinja.compile("{{ foo.bar }}");
     expect(tpl({ foo: { bar: "baz" } })).toEqual("baz");
 
-    tpl = jinja.compile('{{ foo["bar"] }}');
+    tpl = litJinja.compile('{{ foo["bar"] }}');
     expect(tpl({ foo: { bar: 0 } })).toEqual("0");
 
-    tpl = jinja.compile("{{ foo[''] }}");
+    tpl = litJinja.compile("{{ foo[''] }}");
     expect(tpl({ foo: { "": false } })).toEqual("false");
 
-    tpl = jinja.compile("{{ a[b].c }}");
+    tpl = litJinja.compile("{{ a[b].c }}");
     expect(tpl({ a: { x: { c: 1 } }, b: "x" })).toEqual("1");
 
-    tpl = jinja.compile("{{ foo[1] }}");
+    tpl = litJinja.compile("{{ foo[1] }}");
     expect(tpl({ foo: { 1: 2 } })).toEqual("2");
 
-    tpl = jinja.compile("{{ foo[0] }}");
+    tpl = litJinja.compile("{{ foo[0] }}");
     expect(tpl({ foo: [3, 4] })).toEqual("3");
   });
 });
 
 describe("Unescaped Output:", function () {
   it("tests string literals", function () {
-    var tpl = jinja.compile("{{{ text }}}");
+    var tpl = litJinja.compile("{{{ text }}}");
     expect(tpl({ text: "plain" })).toEqual("plain");
 
-    tpl = jinja.compile("{{{ html }}}");
+    tpl = litJinja.compile("{{{ html }}}");
     expect(tpl({ html: "<br>" })).toEqual("<br>");
 
     // tpl = jinja.compile('{{{ "a>c" }}}');
@@ -115,25 +125,29 @@ describe("Unescaped Output:", function () {
 
 describe("Tag: set/assign:", function () {
   it("sets any value as a variable in the current context", function () {
-    expect(jinja.compile("{% assign count = 0 %}{{ count }}")({})).toEqual("0");
-    expect(jinja.compile('{% set foo = "bar" %} {{ foo }}')({})).toEqual(
+    expect(litJinja.compile("{% assign count = 0 %}{{ count }}")({})).toEqual(
+      "0"
+    );
+    expect(litJinja.compile('{% set foo = "bar" %} {{ foo }}')({})).toEqual(
       " bar"
     );
     expect(
-      jinja.compile('{% set foo = ["hi", "bye"] %} {{ foo[0] }}')({})
+      litJinja.compile('{% set foo = ["hi", "bye"] %} {{ foo[0] }}')({})
     ).toEqual(" hi");
     expect(
-      jinja.compile('{% set foo = { bar: "bar" } %} {{ foo.bar }}')({})
+      litJinja.compile('{% set foo = { bar: "bar" } %} {{ foo.bar }}')({})
     ).toEqual(" bar");
-    expect(jinja.compile("{% set foo = 99 %} {{ foo }}")({})).toEqual(" 99");
+    expect(litJinja.compile("{% set foo = 99 %} {{ foo }}")({})).toEqual(" 99");
     expect(
-      jinja.compile("{% set foo = true %}{% if foo == true %}hi{% endif %}")({})
+      litJinja.compile("{% set foo = true %}{% if foo == true %}hi{% endif %}")(
+        {}
+      )
     ).toEqual("hi");
   });
 
   it("sets for current context", function () {
     expect(
-      jinja.compile(
+      litJinja.compile(
         "{% set foo = true %}{% if foo %}{% set foo = false %}{% endif %}{{ foo }}"
       )()
     ).toEqual("false");
@@ -141,7 +155,7 @@ describe("Tag: set/assign:", function () {
 
   it("sets across blocks", function () {
     expect(
-      jinja.compile(
+      litJinja.compile(
         '{% set foo = "foo" %}{% block a %}{{ foo }}{% set foo = "bar" %}{% endblock %}{{ foo }}{% block b %}{{ foo }}{% endblock %}'
       )()
     ).toEqual("foobarbar");
@@ -159,16 +173,16 @@ describe("Filter:", function () {
 
   function testFilter(filter, input, output, message) {
     it(message, function () {
-      var tpl = jinja.compile("{{ v|" + filter + " }}");
+      var tpl = litJinja.compile("{{ v|" + filter + " }}");
       expect(tpl(input, opts)).toEqual(output);
     });
   }
 
   describe("numbers and strings:", function () {
-    var tpl = jinja.compile("{{ 0|add(1) }}");
+    var tpl = litJinja.compile("{{ 0|add(1) }}");
     expect(tpl({}, opts)).toEqual("1");
 
-    tpl = jinja.compile("{{ '0'|add(1) }}");
+    tpl = litJinja.compile("{{ '0'|add(1) }}");
     expect(tpl({}, opts)).toEqual("01");
 
     testFilter("add(2)", { v: 1 }, "3", "add numbers");
@@ -193,20 +207,20 @@ describe("Filter:", function () {
       "test alternate (liquid-style) filter args"
     );
 
-    tpl = jinja.compile("{{ 0 || [1, 'a', false] | join('|') }}");
+    tpl = litJinja.compile("{{ 0 || [1, 'a', false] | join('|') }}");
     expect(tpl({}, opts)).toEqual("1|a|false");
   });
 
   it("set number is really a number", function () {
     var opts = { filters: filters };
     expect(
-      jinja.compile("{% set foo = 1 %}{{ foo|add(1) }}")({}, opts)
+      litJinja.compile("{% set foo = 1 %}{{ foo|add(1) }}")({}, opts)
     ).toEqual("2");
     expect(
-      jinja.compile('{% set foo = "1" %}{{ foo|add(1) }}')({}, opts)
+      litJinja.compile('{% set foo = "1" %}{{ foo|add(1) }}')({}, opts)
     ).toEqual("11");
     expect(
-      jinja.compile("{% set bar = 1 %} {% set foo = bar %}{{ foo|add(1) }}")(
+      litJinja.compile("{% set bar = 1 %} {% set foo = bar %}{{ foo|add(1) }}")(
         {},
         opts
       )
@@ -222,52 +236,52 @@ describe("Filter:", function () {
   });
 
   describe("alternate syntax:", function () {
-    var tpl = jinja.compile("{{ 0 | add: 1 }}");
+    var tpl = litJinja.compile("{{ 0 | add: 1 }}");
     expect(tpl({}, opts)).toEqual("1");
 
-    tpl = jinja.compile('{{ "a" | add: "b" }}');
+    tpl = litJinja.compile('{{ "a" | add: "b" }}');
     expect(tpl({}, opts)).toEqual("ab");
   });
 });
 
 describe.skip("Whitespace Control:", function () {
   it("leading and trailing whitespace", function () {
-    var tpl = jinja.compile(' {{- "abc" }} ');
+    var tpl = litJinja.compile(' {{- "abc" }} ');
     expect(tpl({})).toEqual("abc ");
 
-    tpl = jinja.compile(" {{ 'abc' -}} ");
+    tpl = litJinja.compile(" {{ 'abc' -}} ");
     expect(tpl({})).toEqual(" abc");
 
-    tpl = jinja.compile(' {{{- "a>c" }}} ');
+    tpl = litJinja.compile(' {{{- "a>c" }}} ');
     expect(tpl({})).toEqual("a>c ");
 
-    tpl = jinja.compile(" {{{ 'a&c' -}}} ");
+    tpl = litJinja.compile(" {{{ 'a&c' -}}} ");
     expect(tpl({})).toEqual(" a&c");
   });
 });
 
 describe("Tag: if:", function () {
   it("tests truthy and falsy values", function () {
-    var tpl = jinja.compile(
+    var tpl = litJinja.compile(
       "{% if foo %}hi!{% endif %}{% if bar %}nope{% endif %}"
     );
     expect(tpl({ foo: 1, bar: false })).toEqual("hi!");
 
-    tpl = jinja.compile(
+    tpl = litJinja.compile(
       "{% if !foo %}hi!{% endif %}{% if !bar %}nope{% endif %}"
     );
     expect(tpl({ foo: 1, bar: false })).toEqual("nope");
   });
 
   it("can use not in place of !", function () {
-    var tpl = jinja.compile(
+    var tpl = litJinja.compile(
       "{% if not foo %}hi!{% endif %}{% if not bar %}nope{% endif %}"
     );
     expect(tpl({ foo: true, bar: false })).toEqual("nope", "not operator");
   });
 
   it("can use && and ||", function () {
-    var tpl = jinja.compile("{% if foo && (bar || baz) %}hi!{% endif %}");
+    var tpl = litJinja.compile("{% if foo && (bar || baz) %}hi!{% endif %}");
     expect(tpl({ foo: true, bar: true })).toEqual("hi!");
     expect(tpl({ foo: true, baz: true })).toEqual("hi!");
     expect(tpl({ foo: false })).toEqual("");
@@ -275,39 +289,39 @@ describe("Tag: if:", function () {
   });
 
   it('can use "and" and "or" instead', function () {
-    var tpl = jinja.compile("{% if foo and bar %}hi!{% endif %}");
+    var tpl = litJinja.compile("{% if foo and bar %}hi!{% endif %}");
     expect(tpl({ foo: true, bar: true })).toEqual("hi!");
 
-    tpl = jinja.compile("{% if foo or bar %}hi!{% endif %}");
+    tpl = litJinja.compile("{% if foo or bar %}hi!{% endif %}");
     expect(tpl({ foo: false, bar: true })).toEqual("hi!");
   });
 
   it('can use the "%" operator', function () {
-    var tpl = jinja.compile("{% if foo % 2 == 0 %}hi!{% endif %}");
+    var tpl = litJinja.compile("{% if foo % 2 == 0 %}hi!{% endif %}");
     expect(tpl({ foo: 4 })).toEqual("hi!");
 
-    tpl = jinja.compile("{% if foo % 2 == 0 %}hi!{% endif %}");
+    tpl = litJinja.compile("{% if foo % 2 == 0 %}hi!{% endif %}");
     expect(tpl({ foo: 5 })).toEqual("");
 
-    tpl = jinja.compile("{% if foo % 2 %}hi!{% endif %}");
+    tpl = litJinja.compile("{% if foo % 2 %}hi!{% endif %}");
     expect(tpl({ foo: 4 })).toEqual("");
 
-    tpl = jinja.compile("{% if foo % 2 %}hi!{% endif %}");
+    tpl = litJinja.compile("{% if foo % 2 %}hi!{% endif %}");
     expect(tpl({ foo: 3 })).toEqual("hi!");
   });
 
   it("throws on bad conditional syntax", function () {
     var fn1 = function () {
-        jinja.compile("{% if foo bar %}{% endif %}");
+        litJinja.compile("{% if foo bar %}{% endif %}");
       },
       fn2 = function () {
-        jinja.compile("{% if foo !== > bar %}{% endif %}");
+        litJinja.compile("{% if foo !== > bar %}{% endif %}");
       },
       fn3 = function () {
-        jinja.compile("{% if (foo %}{% endif %}");
+        litJinja.compile("{% if (foo %}{% endif %}");
       },
       fn4 = function () {
-        jinja.compile("{% if foo > bar) %}{% endif %}");
+        litJinja.compile("{% if foo > bar) %}{% endif %}");
       };
     expect(fn1).toThrow();
     expect(fn2).toThrow();
@@ -316,23 +330,23 @@ describe("Tag: if:", function () {
   });
 
   it("can accept some arbitrary parentheses", function () {
-    var tpl = jinja.compile("{% if (foo) %}bar{% endif %}");
+    var tpl = litJinja.compile("{% if (foo) %}bar{% endif %}");
     expect(tpl({ foo: true })).toEqual("bar");
 
-    tpl = jinja.compile("{% if ( foo ) %}bar{% endif %}");
+    tpl = litJinja.compile("{% if ( foo ) %}bar{% endif %}");
     expect(tpl({ foo: true })).toEqual("bar");
 
-    tpl = jinja.compile("{% if ( foo && (bar)) %}bar{% endif %}");
+    tpl = litJinja.compile("{% if ( foo && (bar)) %}bar{% endif %}");
     expect(tpl({ foo: true, bar: true })).toEqual("bar");
 
-    tpl = jinja.compile("{% if (( foo && (bar )) ) %}bar{% endif %}");
+    tpl = litJinja.compile("{% if (( foo && (bar )) ) %}bar{% endif %}");
     expect(tpl({ foo: true, bar: true })).toEqual("bar");
   });
 });
 
 describe("Tag: else:", function () {
   it("gets used", function () {
-    var tpl = jinja.compile(
+    var tpl = litJinja.compile(
       "{% if foo.length > 1 %}hi!{% else %}nope{% endif %}"
     );
     expect(tpl({ foo: [1, 2, 3] })).toEqual("hi!");
@@ -341,14 +355,14 @@ describe("Tag: else:", function () {
 
   it('throws if used outside of "if" context', function () {
     var fn = function () {
-      jinja.compile("{% else %}");
+      litJinja.compile("{% else %}");
     };
     expect(fn).toThrow();
   });
 
   describe("elseif:", function () {
     it("works nicely", function () {
-      var tpl = jinja.compile(
+      var tpl = litJinja.compile(
         "{% if foo.length > 2 %}foo{% elseif foo.length < 2 %}bar{% endif %}"
       );
       expect(tpl({ foo: [1, 2, 3] })).toEqual("foo");
@@ -357,7 +371,7 @@ describe("Tag: else:", function () {
     });
 
     it("accepts conditionals", function () {
-      var tpl = jinja.compile(
+      var tpl = litJinja.compile(
         "{% if foo %}foo{% elseif bar && baz %}bar{% endif %}"
       );
       expect(tpl({ bar: true, baz: true })).toEqual("bar");
@@ -365,7 +379,7 @@ describe("Tag: else:", function () {
   });
 
   it("can have multiple elseif and else conditions", function () {
-    var tpl = jinja.compile(
+    var tpl = litJinja.compile(
       '{% if foo %}foo{% elseif bar === "bar" %}bar{% elseif baz.length == 2 %}baz{% else %}bop{% endif %}'
     );
     expect(tpl({ foo: true })).toEqual("foo");
@@ -377,7 +391,7 @@ describe("Tag: else:", function () {
 
   describe('in "for" tags:', function () {
     it("can be used as fallback", function () {
-      var tpl = jinja.compile(
+      var tpl = litJinja.compile(
         "{% for foo in bar %}blah{% else %}hooray!{% endfor %}"
       );
       expect(tpl({ bar: [] })).toEqual("hooray!");
@@ -389,7 +403,7 @@ describe("Tag: else:", function () {
 
     it('throws if using "elseif"', function () {
       var fn = function () {
-        jinja.compile(
+        litJinja.compile(
           "{% for foo in bar %}hi!{% elseif blah %}nope{% endfor %}"
         );
       };
@@ -398,7 +412,7 @@ describe("Tag: else:", function () {
   });
 });
 describe("Tag: for:", function () {
-  var tpl = jinja.compile("{% for foo in bar %}{{ foo }}, {% endfor %}");
+  var tpl = litJinja.compile("{% for foo in bar %}{{ foo }}, {% endfor %}");
   it("loops arrays", function () {
     expect(tpl({ bar: ["foo", "bar", "baz"] })).toEqual("foo, bar, baz, ");
   });
@@ -410,20 +424,22 @@ describe("Tag: for:", function () {
   });
 
   it("loops object literals", function () {
-    tpl = jinja.compile(
+    tpl = litJinja.compile(
       "{% for foo in {baz: 'foo', pow: 'bar'} %}{{ foo }}, {% endfor %}"
     );
     expect(tpl({})).toEqual("baz, pow, ");
   });
 
   it("loops object literals", function () {
-    tpl = jinja.compile('{%for n in {a: 1, b: "b"} %}{{ foo[n] }}{% endfor %}');
+    tpl = litJinja.compile(
+      '{%for n in {a: 1, b: "b"} %}{{ foo[n] }}{% endfor %}'
+    );
     expect(tpl({ foo: { a: "a", b: 2 } })).toEqual("a2");
   });
 
   describe("loop object:", function () {
     it("index0", function () {
-      var tpl = jinja.compile(
+      var tpl = litJinja.compile(
         "{% for foo in bar %}[{{ loop.index0 }}, {{ foo }}]{% endfor %}"
       );
       expect(tpl({ bar: ["foo", "bar", "baz"] })).toEqual(
@@ -435,8 +451,8 @@ describe("Tag: for:", function () {
     });
 
     it("context", function () {
-      var inner = jinja.compile("{{ f }}", { filename: "inner" }),
-        tpl = jinja.compile(
+      var inner = litJinja.compile("{{ f }}", { filename: "inner" }),
+        tpl = litJinja.compile(
           '{{ f }}{% for f in bar %}{{ f }}{% include "inner" %}{{ f }}{% endfor %}{{ f }}'
         );
       expect(tpl({ f: "z", bar: ["a"] })).toEqual("zaaaz");
@@ -444,7 +460,7 @@ describe("Tag: for:", function () {
     });
 
     it("index", function () {
-      var tpl = jinja.compile(
+      var tpl = litJinja.compile(
         "{% for foo in bar %}{{ loop.index }}{% endfor %}"
       );
       expect(tpl({ bar: ["foo", "bar", "baz"] })).toEqual("123");
@@ -454,7 +470,7 @@ describe("Tag: for:", function () {
     });
 
     it("index0", function () {
-      var tpl = jinja.compile(
+      var tpl = litJinja.compile(
         "{% for foo in bar %}{{ loop.index0 }}{% endfor %}"
       );
       expect(tpl({ bar: ["foo", "bar", "baz"] })).toEqual("012");
@@ -467,16 +483,16 @@ describe("Tag: for:", function () {
 
 describe("Tag: include:", function () {
   it("includes the given template", function () {
-    jinja.compile("{{array.length}}", { filename: "included_2.html" });
+    litJinja.compile("{{array.length}}", { filename: "included_2.html" });
     expect(
-      jinja.compile('{% include "included_2.html" %}')({ array: ["foo"] })
+      litJinja.compile('{% include "included_2.html" %}')({ array: ["foo"] })
     ).toEqual("1");
   });
 
   it("includes from parent templates", function () {
-    jinja.compile("foobar", { filename: "foobar" });
-    jinja.compile('{% include "foobar" %}', { filename: "parent" });
-    expect(jinja.compile('{% extends "parent" %}')()).toEqual("foobar");
+    litJinja.compile("foobar", { filename: "foobar" });
+    litJinja.compile('{% include "foobar" %}', { filename: "parent" });
+    expect(litJinja.compile('{% extends "parent" %}')()).toEqual("foobar");
   });
 });
 describe.skip("Tag: block:", function () {
@@ -502,8 +518,8 @@ describe.skip("Tag: block:", function () {
         "{% endblock %}",
       ].join("\n");
 
-    jinja.compile(extends_base, { filename: "extends_base" });
-    tpl = jinja.compile(extends1, { filename: "extends1" });
+    litJinja.compile(extends_base, { filename: "extends_base" });
+    tpl = litJinja.compile(extends1, { filename: "extends1" });
     expect(tpl({})).toEqual(
       'This is from the "extends_base" template.\n\n\n  This is the "extends_1" content in block `one`\n\n\n\n  This is the default content in block `two`\n'
     );
@@ -539,9 +555,9 @@ describe.skip("Tag: block:", function () {
         "{% endblock %}",
       ].join("\n");
 
-    jinja.compile(extends_base, { filename: "extends_base" });
-    jinja.compile(extends1, { filename: "extends1" });
-    tpl = jinja.compile(extends2, { filename: "extends2" });
+    litJinja.compile(extends_base, { filename: "extends_base" });
+    litJinja.compile(extends1, { filename: "extends1" });
+    tpl = litJinja.compile(extends2, { filename: "extends2" });
     expect(tpl({})).toEqual(
       'This is from the "extends_base" template.\n\n\n  This is the "extends_2" content in block `one`\n\n\n\n  This is the default content in block `two`\n'
     );

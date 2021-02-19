@@ -303,7 +303,7 @@ Parser.prototype.parseQuoted = function (str) {
 function compile(markup, opts) {
   opts = opts || {};
   var parser = new Parser();
-  parser.readTemplateFile = this.readTemplateFile;
+  parser.readTemplateFile = this && this.readTemplateFile;
   var code = [
     "({get,set,push,pop,filter,each,block,html}) => { ",
     "return html`",
