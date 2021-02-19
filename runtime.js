@@ -103,7 +103,7 @@ function createRuntime({ html, unsafeHTML, repeat, ...opts }) {
           return fn1((ctx[loopvar] = arr[i]));
         });
       // revisit this
-      setImmediate(pop);
+      Promise.resolve(true).then(pop);
       return result;
     };
     var block = function (fn) {
