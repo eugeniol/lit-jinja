@@ -1,9 +1,9 @@
-const { html, render } = require("lit-html");
-const { unsafeHTML } = require("lit-html/directives/unsafe-html");
-const { repeat } = require("lit-html/directives/repeat");
-const createRuntime = require("../runtime");
+import { html, render } from "lit-html";
+import { unsafeHTML } from "lit-html/directives/unsafe-html";
+import { repeat } from "lit-html/directives/repeat";
+import  createRuntime from "../runtime";
 
-const { compile } = require("../");
+import { compile } from "../";
 
 const runtime = createRuntime({ html, unsafeHTML, repeat });
 

@@ -1,7 +1,7 @@
-function createRuntime({ html, unsafeHTML, repeat, ...opts }) {
-  return (data, opts) => {
-    var defaults = { 
-      // autoEscape: "html" 
+export function createRuntime({ html, unsafeHTML, repeat, ...opts }) {
+  return function runtime(data, opts) {
+    var defaults = {
+      // autoEscape: "html"
     };
     var _toString = Object.prototype.toString;
     var _hasOwnProperty = Object.prototype.hasOwnProperty;
@@ -94,16 +94,16 @@ function createRuntime({ html, unsafeHTML, repeat, ...opts }) {
       var arr = isArray(obj) ? obj : getKeys(obj),
         len = arr.length;
       var ctx = { loop: { length: len, first: arr[0], last: arr[len - 1] } };
-      push(ctx);
+      // push(ctx);
       let result;
       if (len == 0 && fn2) result = fn2();
       else
         result = repeat(arr, (item, i) => {
-          extend(ctx.loop, { index: i + 1, index0: i });
-          return fn1((ctx[loopvar] = arr[i]));
+          // extend(ctx.loop, { index: i + 1, index0: i });
+          return fn1(runtime({ [loopvar]: item, index: i + 1, index0: i, ...ctx }, { ...opts, stack }));
         });
       // revisit this
-      Promise.resolve(true).then(pop);
+      // Promise.resolve(true).then(pop);
       return result;
     };
     var block = function (fn) {
@@ -139,7 +139,7 @@ function createRuntime({ html, unsafeHTML, repeat, ...opts }) {
       },
       opts.filters || {}
     );
-    var stack = [create(data || {})],
+    var stack = [create(data || {}), ...((opts && opts.stack) || [])],
       output = [];
     return {
       get: get,
@@ -156,4 +156,4 @@ function createRuntime({ html, unsafeHTML, repeat, ...opts }) {
   };
 }
 
-module.exports = createRuntime;
+export default createRuntime;

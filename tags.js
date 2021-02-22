@@ -1,5 +1,5 @@
 //the context 'this' inside tagHandlers is the parser instance
-module.exports = {
+const tagHandlers = {
   if(expr) {
     this.push("${ " + this.parseExpr(expr) + " ? html`");
     this.nest.unshift("if");
@@ -36,7 +36,7 @@ module.exports = {
         this.parseExpr(expr) +
         "," +
         JSON.stringify(name) +
-        ",() => html`"
+        ",({get,set,push,pop,filter,each,block}) => html`"
     );
     this.nest.unshift("for");
   },
@@ -106,7 +106,9 @@ module.exports = {
 };
 
 //liquid style
-module.exports.assign = module.exports.set;
+tagHandlers.assign = tagHandlers.set;
 
 //python/django style
-module.exports.elif = module.exports.elseif;
+tagHandlers.elif = tagHandlers.elseif;
+
+export default tagHandlers;
