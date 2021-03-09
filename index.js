@@ -320,14 +320,11 @@ function compile(markup, opts) {
         }
         return templateFile;
     };
-    var code = [
-        "({get,set,push,pop,filter,each,block,html}) => { ",
-        "return html`",
-        ...parser.parse(markup),
-        "`; }",
-    ].join("");
 
-    return new Function("runtime", "return (" + code + ")(runtime)");
+    return new Function(
+        "{get,set,push,pop,filter,each,block,html}",
+        "return html`" + parser.parse(markup).join("") + "`"
+    );
 }
 
 function readTemplateFile(name) {
